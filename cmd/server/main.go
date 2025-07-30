@@ -7,6 +7,7 @@ import (
 )
 
 func main() {
-	server := s.NewServer(":8080")
+	var server *s.Server
+	server = s.NewServer(":8080")
 	log.Fatal(server.Start())
 }
