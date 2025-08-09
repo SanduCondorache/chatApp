@@ -11,3 +11,6 @@ run-server: build-server
 
 run-client: build-client
 	./bin/client
+
+test:
+	go test ./...

@@ -1,13 +1,10 @@
 package main
 
-import (
-	"log"
-
-	s "github.com/SanduCondorache/chatApp/cmd/server/server"
-)
+import "github.com/SanduCondorache/chatApp/internal/server"
 
 func main() {
-	var server *s.Server
-	server = s.NewServer(":8080")
-	log.Fatal(server.Start())
+	s := server.NewServer(":8080")
+	if err := s.Start(); err != nil {
+		panic(err)
+	}
 }
