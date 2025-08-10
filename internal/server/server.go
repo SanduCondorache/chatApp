@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"github.com/SanduCondorache/chatApp/internal/types"
 	"github.com/SanduCondorache/chatApp/utils"
 	"github.com/gorilla/websocket"
+	"github.com/mattn/go-sqlite3"
 )
 
 type Server struct {
@@ -23,13 +25,13 @@ type Server struct {
 	Clients    map[*websocket.Conn]bool
 	AddCh      chan *websocket.Conn
 	RemoveCh   chan *websocket.Conn
-	MsgCh      chan types.Message
+	MsgCh      chan types.ChatMessage
 	QuitCh     chan struct{}
 	Database   *sql.DB
 	mutex      sync.Mutex
 }
 
-func NewServer(listenAddr string) *Server {
+func CreateServer(listenAddr string, db *sql.DB) *Server {
 	return &Server{
 		ListenAddr: listenAddr,
 		Upgrader: websocket.Upgrader{
@@ -43,10 +45,27 @@ func NewServer(listenAddr string) *Server {
 		AddCh:    make(chan *websocket.Conn),
 		RemoveCh: make(chan *websocket.Conn),
 		QuitCh:   make(chan struct{}),
-		MsgCh:    make(chan types.Message),
+		MsgCh:    make(chan types.ChatMessage),
 		mutex:    sync.Mutex{},
-		Database: db.CreateDb("../database/database.sql"),
+		Database: db,
 	}
+}
+
+func NewServer(listenAddr string) *Server {
+	dbPath := "../database/database.sql"
+
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		fmt.Println("DB file not found, creating and initializing DB...")
+		db := db.CreateDb(dbPath)
+		return CreateServer(listenAddr, db)
+	}
+
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		log.Fatal("Failed to open existing DB: ", err)
+	}
+
+	return CreateServer(listenAddr, db)
 }
 
 func (s *Server) Start() error {
@@ -72,6 +91,44 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	go s.readLoop(conn)
 }
 
+func (s *Server) readUser(msg types.Envelope, conn *websocket.Conn) error {
+	var u types.User
+	if err := json.Unmarshal(msg.Payload, &u); err != nil {
+		return err
+	}
+
+	err := db.InsertUser(s.Database, &u)
+	if err != nil {
+		var errr sqlite3.Error
+		if errors.As(err, &errr) && errr.Code == sqlite3.ErrConstraint {
+
+			eror := types.NewMessage("username_taken")
+			data, _ := eror.ToEnvelopePayload()
+			env := types.NewEnvelope("error", data)
+			_ = conn.WriteJSON(&env)
+			log.Println("Username is already used")
+			return nil
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (s *Server) readMessage(msg types.Envelope, conn *websocket.Conn) error {
+	var m types.ChatMessage
+	if err := json.Unmarshal(msg.Payload, &m); err != nil {
+		return err
+	}
+	s.MsgCh <- types.ChatMessage{
+		From:    utils.NormalizeAddr(conn.RemoteAddr().String()),
+		Payload: bytes.TrimSpace(m.Payload),
+	}
+
+	return nil
+
+}
+
 func (s *Server) readLoop(conn *websocket.Conn) {
 	defer func() {
 		s.RemoveCh <- conn
@@ -89,15 +146,15 @@ func (s *Server) readLoop(conn *websocket.Conn) {
 		switch msg.Type {
 		case "init":
 			fmt.Println("Initial messsage from " + utils.NormalizeAddr(conn.RemoteAddr().String()))
-		case "chat":
-			var m types.Message
-			if err := json.Unmarshal(msg.Payload, &m); err != nil {
-				log.Println("Unmarshal error: ", err)
+			if err := s.readUser(msg, conn); err != nil {
+				log.Println("reading user err: ", err)
 				return
 			}
-			s.MsgCh <- types.Message{
-				From:    utils.NormalizeAddr(conn.RemoteAddr().String()),
-				Payload: bytes.TrimSpace(m.Payload),
+		case "chat":
+			s.readMessage(msg, conn)
+			if err := s.readMessage(msg, conn); err != nil {
+				log.Println("reading message err: ", err)
+				return
 			}
 		default:
 			fmt.Println("unknown message type ", msg.Type)

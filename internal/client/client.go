@@ -1,6 +1,7 @@
 package client
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/url"
@@ -8,6 +9,56 @@ import (
 	"github.com/SanduCondorache/chatApp/internal/types"
 	"github.com/gorilla/websocket"
 )
+
+func readUser() (*types.User, error) {
+	var username, email, password string
+
+	fmt.Printf("Enter username: ")
+	if _, err := fmt.Scanln(&username); err != nil {
+		fmt.Println("Input error: ", err)
+		return nil, err
+	}
+
+	fmt.Printf("Enter email: ")
+	if _, err := fmt.Scanln(&email); err != nil {
+		fmt.Println("Input error: ", err)
+		return nil, err
+	}
+
+	fmt.Printf("Enter password: ")
+	if _, err := fmt.Scanln(&password); err != nil {
+		fmt.Println("Input error: ", err)
+		return nil, err
+	}
+
+	payload := types.NewUser(username, email, password)
+	return payload, nil
+}
+
+func handlingErrors(conn *websocket.Conn, msg types.Envelope) {
+	p := msg.Payload
+	var m types.Message
+
+	if err := json.Unmarshal(p, &m); err != nil {
+		log.Println("unmarshal error: ", err)
+	}
+
+	er := string(m.Payload)
+
+	switch er {
+	case "username_taken":
+		payload, err := readUser()
+		if err != nil {
+			return
+		}
+
+		if err = sendMessage(conn, payload, "init"); err != nil {
+			fmt.Println("Sending error: ", err)
+			return
+		}
+	}
+
+}
 
 func readMessage(conn *websocket.Conn, done chan struct{}) {
 	var msg types.Envelope
@@ -22,10 +73,13 @@ func readMessage(conn *websocket.Conn, done chan struct{}) {
 
 		t := msg.Type
 
-		if t == "exit" {
+		switch t {
+		case "exit":
 			log.Println("Server requested exit. Closing client...")
 			close(done)
 			return
+		case "error":
+			handlingErrors(conn, msg)
 		}
 	}
 }
@@ -52,27 +106,11 @@ func RunClient() {
 	}
 	defer conn.Close()
 
-	var username, email, password string
-
-	fmt.Printf("Enter username: ")
-	if _, err = fmt.Scanln(&username); err != nil {
-		fmt.Println("Input error: ", err)
+	payload, err := readUser()
+	if err != nil {
 		return
 	}
 
-	fmt.Printf("Enter email: ")
-	if _, err = fmt.Scanln(&email); err != nil {
-		fmt.Println("Input error: ", err)
-		return
-	}
-
-	fmt.Printf("Enter password: ")
-	if _, err = fmt.Scanln(&password); err != nil {
-		fmt.Println("Input error: ", err)
-		return
-	}
-
-	payload := types.NewUser(username, email, password)
 	if err = sendMessage(conn, payload, "init"); err != nil {
 		fmt.Println("Sending error: ", err)
 		return
@@ -100,7 +138,7 @@ func RunClient() {
 			log.Println("Shutting down client...")
 			return
 		case input := <-inputCh:
-			payload := types.NewMessage("", []byte(input))
+			payload := types.NewChatMessage("", []byte(input))
 			if err = sendMessage(conn, payload, "chat"); err != nil {
 				fmt.Println("Sending error: ", err)
 				return

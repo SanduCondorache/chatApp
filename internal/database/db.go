@@ -49,12 +49,12 @@ func CreateDb(path string) *sql.DB {
 	return db
 }
 
-func InsertUser(db *sql.DB, user types.User) error {
+func InsertUser(db *sql.DB, user *types.User) error {
 	_, err := db.Exec("INSERT INTO users (username, email, password) VALUES (?, ?, ?)", user.Username, user.Email, user.Password)
 	return err
 }
 
-func GetUserId(db *sql.DB, user types.User) (int, error) {
+func GetUserId(db *sql.DB, user *types.User) (int, error) {
 	rows, err := db.Query("SELECT id FROM users WHERE username = ?", user.Username)
 
 	if err != nil {
