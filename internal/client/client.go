@@ -35,7 +35,7 @@ func readUser() (*types.User, error) {
 	return payload, nil
 }
 
-func handlingErrors(conn *websocket.Conn, msg types.Envelope) {
+func handlingErrors(conn *websocket.Conn, msg types.Envelope, pauseCh chan bool) {
 	p := msg.Payload
 	var m types.Message
 
@@ -44,23 +44,31 @@ func handlingErrors(conn *websocket.Conn, msg types.Envelope) {
 	}
 
 	er := string(m.Payload)
+	fmt.Println(er)
 
 	switch er {
 	case "username_taken":
+		pauseCh <- true
 		payload, err := readUser()
 		if err != nil {
+			fmt.Println("mata")
+			pauseCh <- false
 			return
 		}
+
+		fmt.Println(payload)
 
 		if err = sendMessage(conn, payload, "init"); err != nil {
 			fmt.Println("Sending error: ", err)
 			return
 		}
+		pauseCh <- false
+
 	}
 
 }
 
-func readMessage(conn *websocket.Conn, done chan struct{}) {
+func readMessage(conn *websocket.Conn, done chan struct{}, pauseCh chan bool) {
 	var msg types.Envelope
 	for {
 		msg = types.Envelope{}
@@ -73,13 +81,15 @@ func readMessage(conn *websocket.Conn, done chan struct{}) {
 
 		t := msg.Type
 
+		fmt.Println(t)
+
 		switch t {
 		case "exit":
 			log.Println("Server requested exit. Closing client...")
 			close(done)
 			return
 		case "error":
-			handlingErrors(conn, msg)
+			handlingErrors(conn, msg, pauseCh)
 		}
 	}
 }
@@ -117,18 +127,34 @@ func RunClient() {
 	}
 
 	done := make(chan struct{})
-	go readMessage(conn, done)
+	pauseCh := make(chan bool)
+	go readMessage(conn, done, pauseCh)
 
 	inputCh := make(chan string)
 
 	go func() {
 		var input string
+		paused := false
 		for {
-			_, err := fmt.Scanln(&input)
-			if err != nil {
+			if paused {
+				// Wait until resume
+				p := <-pauseCh
+				paused = p
 				continue
 			}
-			inputCh <- input
+
+			select {
+			case p := <-pauseCh:
+				paused = p
+				continue
+			default:
+				// Only read when not paused
+				_, err := fmt.Scanln(&input)
+				if err != nil {
+					continue
+				}
+				inputCh <- input
+			}
 		}
 	}()
 

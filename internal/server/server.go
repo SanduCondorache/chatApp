@@ -12,7 +12,7 @@ import (
 	"os"
 	"sync"
 
-	db "github.com/SanduCondorache/chatApp/internal/database"
+	dab "github.com/SanduCondorache/chatApp/internal/database"
 	"github.com/SanduCondorache/chatApp/internal/types"
 	"github.com/SanduCondorache/chatApp/utils"
 	"github.com/gorilla/websocket"
@@ -52,17 +52,28 @@ func CreateServer(listenAddr string, db *sql.DB) *Server {
 }
 
 func NewServer(listenAddr string) *Server {
-	dbPath := "../database/database.sql"
+	dbPath := "./internal/database/database.sql"
 
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		fmt.Println("DB file not found, creating and initializing DB...")
-		db := db.CreateDb(dbPath)
+		db := dab.CreateDb(dbPath)
 		return CreateServer(listenAddr, db)
 	}
 
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
-		log.Fatal("Failed to open existing DB: ", err)
+		log.Println("Opening database error: ", err)
+		return nil
+	}
+
+	has, err := dab.CheckTablesExists(db)
+
+	if err != nil {
+		log.Println("query error: ", err)
+	}
+
+	if !has {
+		return CreateServer(listenAddr, dab.CreateDb(dbPath))
 	}
 
 	return CreateServer(listenAddr, db)
@@ -97,7 +108,7 @@ func (s *Server) readUser(msg types.Envelope, conn *websocket.Conn) error {
 		return err
 	}
 
-	err := db.InsertUser(s.Database, &u)
+	err := dab.InsertUser(s.Database, &u)
 	if err != nil {
 		var errr sqlite3.Error
 		if errors.As(err, &errr) && errr.Code == sqlite3.ErrConstraint {
@@ -151,7 +162,6 @@ func (s *Server) readLoop(conn *websocket.Conn) {
 				return
 			}
 		case "chat":
-			s.readMessage(msg, conn)
 			if err := s.readMessage(msg, conn); err != nil {
 				log.Println("reading message err: ", err)
 				return

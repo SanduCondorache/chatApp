@@ -91,3 +91,23 @@ func insertMessage(db *sql.DB, sender_id, recipient_id int, content string) erro
 //
 // 	defer rows.Close()
 // }
+
+func CheckTablesExists(db *sql.DB) (bool, error) {
+	var hasTable bool
+	err := db.QueryRow(`
+		SELECT EXISTS(
+			SELECT 1
+			FROM sqlite_master
+			WHERE type='table'
+			  AND name NOT LIKE 'sqlite_%'
+			LIMIT 1
+		);
+	`).Scan(&hasTable)
+
+	if err != nil {
+		return false, err
+	}
+
+	return hasTable, nil
+
+}
