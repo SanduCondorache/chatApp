@@ -12,6 +12,7 @@ import (
 	"os"
 	"sync"
 
+	"github.com/SanduCondorache/chatApp/internal/config"
 	dab "github.com/SanduCondorache/chatApp/internal/database"
 	"github.com/SanduCondorache/chatApp/internal/types"
 	"github.com/SanduCondorache/chatApp/utils"
@@ -22,7 +23,7 @@ import (
 type Server struct {
 	ListenAddr string
 	Upgrader   websocket.Upgrader
-	Clients    map[*websocket.Conn]bool
+	Clients    map[*websocket.Conn]types.User
 	AddCh      chan *websocket.Conn
 	RemoveCh   chan *websocket.Conn
 	MsgCh      chan types.ChatMessage
@@ -41,7 +42,7 @@ func CreateServer(listenAddr string, db *sql.DB) *Server {
 				return true
 			},
 		},
-		Clients:  make(map[*websocket.Conn]bool),
+		Clients:  make(map[*websocket.Conn]types.User),
 		AddCh:    make(chan *websocket.Conn),
 		RemoveCh: make(chan *websocket.Conn),
 		QuitCh:   make(chan struct{}),
@@ -52,7 +53,7 @@ func CreateServer(listenAddr string, db *sql.DB) *Server {
 }
 
 func NewServer(listenAddr string) *Server {
-	dbPath := "./internal/database/database.sql"
+	dbPath := config.Envs.DBPath
 
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
 		fmt.Println("DB file not found, creating and initializing DB...")
@@ -112,16 +113,24 @@ func (s *Server) readUser(msg types.Envelope, conn *websocket.Conn) error {
 	if err != nil {
 		var errr sqlite3.Error
 		if errors.As(err, &errr) && errr.Code == sqlite3.ErrConstraint {
-
 			eror := types.NewMessage("username_taken")
 			data, _ := eror.ToEnvelopePayload()
 			env := types.NewEnvelope("error", data)
 			_ = conn.WriteJSON(&env)
+
 			log.Println("Username is already used")
 			return nil
 		}
 		return err
 	}
+
+	eror := types.NewMessage("ok")
+	data, _ := eror.ToEnvelopePayload()
+	env := types.NewEnvelope("ok", data)
+	_ = conn.WriteJSON(&env)
+	s.mutex.Lock()
+	s.Clients[conn] = u
+	s.mutex.Unlock()
 
 	return nil
 }
@@ -131,13 +140,13 @@ func (s *Server) readMessage(msg types.Envelope, conn *websocket.Conn) error {
 	if err := json.Unmarshal(msg.Payload, &m); err != nil {
 		return err
 	}
+
 	s.MsgCh <- types.ChatMessage{
 		From:    utils.NormalizeAddr(conn.RemoteAddr().String()),
 		Payload: bytes.TrimSpace(m.Payload),
 	}
 
 	return nil
-
 }
 
 func (s *Server) readLoop(conn *websocket.Conn) {
@@ -155,13 +164,13 @@ func (s *Server) readLoop(conn *websocket.Conn) {
 		}
 
 		switch msg.Type {
-		case "init":
+		case types.Login:
 			fmt.Println("Initial messsage from " + utils.NormalizeAddr(conn.RemoteAddr().String()))
 			if err := s.readUser(msg, conn); err != nil {
 				log.Println("reading user err: ", err)
 				return
 			}
-		case "chat":
+		case types.Chat:
 			if err := s.readMessage(msg, conn); err != nil {
 				log.Println("reading message err: ", err)
 				return
@@ -178,7 +187,7 @@ func (s *Server) broadcastLoop() {
 		select {
 		case conn := <-s.AddCh:
 			s.mutex.Lock()
-			s.Clients[conn] = true
+			s.Clients[conn] = *types.NewUser("", "", "")
 			s.mutex.Unlock()
 			fmt.Println("New client connected")
 
@@ -221,7 +230,7 @@ func (s *Server) listenForExit() {
 			close(s.QuitCh)
 
 			s.mutex.Lock()
-			env := types.NewEnvelope("exit", nil)
+			env := types.NewEnvelope(types.Exit, nil)
 			for conn := range s.Clients {
 				if err := conn.WriteJSON(env); err != nil {
 					fmt.Println("write error:", err)
@@ -229,7 +238,7 @@ func (s *Server) listenForExit() {
 				}
 				conn.Close()
 			}
-			s.Clients = make(map[*websocket.Conn]bool)
+			s.Clients = make(map[*websocket.Conn]types.User)
 			s.mutex.Unlock()
 
 			os.Exit(0)

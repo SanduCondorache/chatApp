@@ -1,13 +1,15 @@
 package types
 
-import "encoding/json"
+import (
+	"encoding/json"
+)
 
 type Envelope struct {
-	Type    string `json:"type"`
+	Type    MessageType `json:"type"`
 	Payload json.RawMessage
 }
 
-func NewEnvelope(t string, payload json.RawMessage) *Envelope {
+func NewEnvelope(t MessageType, payload json.RawMessage) *Envelope {
 	return &Envelope{
 		Type:    t,
 		Payload: payload,
