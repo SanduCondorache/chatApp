@@ -1,0 +1,149 @@
+.split-container {
+    user-select: none;
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: #2e3440;
+    color: #d8dee9;
+}
+
+.split-pane {
+  overflow: auto;
+  padding: 1rem;
+}
+
+.left-pane {
+  display: flex;
+  min-width: 120px;
+  max-width: 80%;
+  background: #2e3440;
+  overflow: visible;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.right-pane {
+  user-select: none;
+  flex: 1;
+  background: #3b4252;
+}
+
+.divider {
+  width: 5px;
+  cursor: col-resize;
+  background: #4c566a;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  padding: 0.4rem 0.8rem;
+  min-width: 150px;
+  max-width: 100%;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+  border: 1px solid #4c566a;
+  border-radius: 12px;
+  background: #434c5e;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.3);
+}
+
+.search.has-results {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom: none; 
+}
+
+.search-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  border-top: none; 
+  border-radius: 0 0 10px 10px; 
+  background: #434c5e;
+  box-shadow: 0 6px 14px rgba(0,0,0,0.3);
+  z-index: 2;
+}
+
+
+.search-dropdown::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 6px;          
+  width: 100%;
+  background: #434c5e;  
+}
+
+.search .material-symbols-outlined {
+  color: #d8dee9;
+  margin-right: 0.5rem;
+  font-size: 20px;
+}
+
+.search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #eceff4;
+  font-size: 14px;
+}
+
+.search-input::placeholder {
+  color: #88c0d0;
+}
+
+.search:focus-within {
+  background: #3b4252;
+}
+
+.split-container,
+.left-pane,
+.right-pane,
+.diider {
+  user-select: none;
+  cursor: default;
+}
+
+input,
+textarea,
+.search-input {
+  user-select: text;
+  cursor: text;
+}
+
+
+.search-wrapper {
+  position: relative;
+  width: 100%;              /* take full width of left pane */
+  justify-content: center;  /* center children horizontally */
+}
+
+.search-form {
+  width: 100%;
+}
+
+.search-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.search-item:hover {
+  background: #88c0d0;
+  color: #2e3440;
+}
+.selected-result {
+  margin-top: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  background: #3b4252;
+  border-radius: 8px;
+  color: #eceff4;
+  font-size: 14px;
+}
+

@@ -78,6 +78,32 @@ func GetUserId(db *sql.DB, user *types.User) (int, error) {
 	return id, nil
 }
 
+func GetUsername(db *sql.DB, username string) (bool, error) {
+	rows, err := db.Query("SELECT 1 FROM users WHERE username = ?", username)
+
+	if err != nil {
+		return false, err
+	}
+
+	defer rows.Close()
+
+	var id int
+	for rows.Next() {
+		err = rows.Scan(&id)
+		if err != nil {
+			return false, nil
+		}
+	}
+
+	if err = rows.Err(); err != nil {
+		return false, nil
+	}
+
+	exists := id == 1
+
+	return exists, nil
+}
+
 func insertMessage(db *sql.DB, sender_id, recipient_id int, content string) error {
 	_, err := db.Exec("INSERT INTO messages (sender_id, recipient_id, content) VALUES (?, ?, ?)", sender_id, recipient_id, content)
 	return err

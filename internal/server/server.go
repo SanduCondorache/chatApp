@@ -110,6 +110,7 @@ func (s *Server) readUser(msg types.Envelope, conn *websocket.Conn) error {
 	}
 
 	err := dab.InsertUser(s.Database, &u)
+	fmt.Println(u, err)
 	if err != nil {
 		var errr sqlite3.Error
 		if errors.As(err, &errr) && errr.Code == sqlite3.ErrConstraint {
@@ -149,6 +150,35 @@ func (s *Server) readMessage(msg types.Envelope, conn *websocket.Conn) error {
 	return nil
 }
 
+func (s *Server) findUser(msg types.Envelope, conn *websocket.Conn) error {
+	var m types.Message
+	if err := json.Unmarshal(msg.Payload, &m); err != nil {
+		return err
+	}
+
+	exists, err := dab.GetUsername(s.Database, string(m.Payload))
+	fmt.Println(exists)
+
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		eror := types.NewMessage("user_not_found")
+		data, _ := eror.ToEnvelopePayload()
+		env := types.NewEnvelope("error", data)
+		_ = conn.WriteJSON(&env)
+
+		return nil
+	}
+
+	eror := types.NewMessage("ok")
+	data, _ := eror.ToEnvelopePayload()
+	env := types.NewEnvelope("ok", data)
+	_ = conn.WriteJSON(&env)
+	return nil
+}
+
 func (s *Server) readLoop(conn *websocket.Conn) {
 	defer func() {
 		s.RemoveCh <- conn
@@ -172,6 +202,11 @@ func (s *Server) readLoop(conn *websocket.Conn) {
 			}
 		case types.Chat:
 			if err := s.readMessage(msg, conn); err != nil {
+				log.Println("reading message err: ", err)
+				return
+			}
+		case types.Find:
+			if err := s.findUser(msg, conn); err != nil {
 				log.Println("reading message err: ", err)
 				return
 			}

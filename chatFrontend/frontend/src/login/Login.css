@@ -1,0 +1,115 @@
+section {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100vh;
+    background: url('../assets/images/home.jpg') no-repeat;
+    background-size: cover;
+    background-position: center;
+}
+
+.login-box {
+    position: relative;
+    width: 400px;
+    height: 450px;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+    border-radius: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(15px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    background: rgba(30, 40, 60, 0.85);
+    -webkit-backdrop-filter: blur(15px);
+}
+
+h2 {
+    font-size: 2em;
+    color: #ffffff;
+    text-align: center;
+}
+
+.input-box {
+    position: relative;
+    width: 310px;
+    margin: 30px 0;
+    border-bottom: 2px solid #88c0d0;
+}
+
+.input-box label {
+    position: absolute;
+    top: 50%;
+    left: 5px;
+    transform: translateY(-50%);
+    font-size: 1em;
+    color: #c0d0e0;
+    pointer-events: none;
+    transition: .5s;
+}
+
+.input-box input:focus {
+    outline: none;
+}
+
+.input-box input:focus~label,
+.input-box input:valid~label {
+    top: -5px;
+}
+
+.input-box input {
+    width: 100%;
+    height: 50px;
+    background: transparent;
+    border: none;
+    font-size: 1em;
+    color: #fff;
+    padding: 0 35px 0 5px;
+}
+
+.input-box .icon {
+    position: absolute;
+    right: 8px;
+}
+
+button {
+    width: 100%;
+    height: 40px;
+    background: #88c0d0;
+    border: none;
+    outline: node;
+    border-radius: 40px;
+    font-size: 1em;
+    color: #000;
+    font-weight: 500;
+}
+
+button:hover {
+    background: #8fc1d9;
+}
+
+.register-link {
+    font-size: .9em;
+    color: #c0d0e0;
+    text-align: center;
+    margin: 15px 0 10px;
+}
+
+.register-link p a {
+    color: #88c0d0;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.register-link p a:hover {
+    color: #8fc1d9;
+    text-decoraction: underline;
+}
+
+.error-message {
+    color: #cc5250;
+    font-size: 1rem;
+    margin: 10px 0 10px;
+}
+
+

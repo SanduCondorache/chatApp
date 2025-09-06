@@ -61,7 +61,24 @@ func readMessage(conn *websocket.Conn, done chan struct{}) {
 	}
 }
 
-func sendMessage(conn *websocket.Conn, payload types.Payload, t types.MessageType) error {
+func ReadMessage(conn *websocket.Conn) (string, error) {
+	msg := types.Envelope{}
+	err := conn.ReadJSON(&msg)
+	if err != nil {
+		return "", err
+	}
+	var m types.Message
+
+	if err := json.Unmarshal(msg.Payload, &m); err != nil {
+		return "", err
+	}
+
+	fmt.Println(string(m.Payload))
+
+	return string(m.Payload), nil
+}
+
+func SendMessage(conn *websocket.Conn, payload types.Payload, t types.MessageType) error {
 	p, err := payload.ToEnvelopePayload()
 	if err != nil {
 		return err
@@ -81,7 +98,7 @@ func auth(conn *websocket.Conn, done chan struct{}) bool {
 				log.Println("scan error: ", err)
 				return false
 			}
-			err = sendMessage(conn, user, types.Login)
+			err = SendMessage(conn, user, types.Login)
 			if err != nil {
 				log.Println("sending error: ", err)
 				return false
@@ -166,7 +183,7 @@ func RunClient() {
 				continue
 			}
 			payload := handleMessageSent(text)
-			if err := sendMessage(conn, payload, types.Chat); err != nil {
+			if err := SendMessage(conn, payload, types.Chat); err != nil {
 				log.Println("Send error:", err)
 				return
 			}

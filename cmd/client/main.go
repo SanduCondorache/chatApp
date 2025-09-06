@@ -1,6 +1,6 @@
 package main
 
-import "github.com/SanduCondorache/chatApp/pkg/client"
+import "github.com/SanduCondorache/chatApp/internal/client"
 
 func main() {
 	client.RunClient()
