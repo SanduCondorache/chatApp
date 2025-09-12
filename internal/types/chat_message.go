@@ -1,16 +1,23 @@
 package types
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 type ChatMessage struct {
-	From    string `json:"from"`
-	Payload []byte `json:"payload"`
+	Send       string    `json:"send_id"`
+	Recv       string    `json:"recv_id"`
+	Msg        string    `json:"msg"`
+	Created_at time.Time `json:"created_at"`
 }
 
-func NewChatMessage(From string, Payload []byte) *ChatMessage {
+func NewChatMessage(send, recv string, msg string, time time.Time) *ChatMessage {
 	return &ChatMessage{
-		From:    From,
-		Payload: Payload,
+		Msg:        msg,
+		Created_at: time,
+		Send:       send,
+		Recv:       recv,
 	}
 }
 

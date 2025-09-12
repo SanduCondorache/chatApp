@@ -36,6 +36,7 @@ export function LeftView({ onSelect }: LeftViewProps) {
         }
         if (results[0] === "User not found") {
             setResults([]);
+            onSelect("");
             return;
         }
         setselected(prev => [...prev, value]);

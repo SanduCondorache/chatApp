@@ -3,7 +3,11 @@ import "./Login.css";
 import { Login as GoLogin } from "../../wailsjs/go/main/App.js"
 import { useState } from "react";
 
-export function Login() {
+type LoginProps = {
+    onSelect: (value: string) => void;
+};
+
+export function Login({ onSelect }: LoginProps) {
     const navigate = useNavigate();
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
@@ -17,6 +21,7 @@ export function Login() {
             const result = await GoLogin(username, email, password);
             if (result == "ok") {
                 console.log("Login success");
+                onSelect(username);
                 navigate('/home');
             } else if (result == "username_taken") {
                 setErr("Username is already taken");

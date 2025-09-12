@@ -67,15 +67,27 @@ func GetUserId(db *sql.DB, user *types.User) (int, error) {
 	for rows.Next() {
 		err = rows.Scan(&id)
 		if err != nil {
-			return 0, nil
+			return 0, err
 		}
 	}
 
 	if err = rows.Err(); err != nil {
-		return 0, nil
+		return 0, err
 	}
 
 	return id, nil
+}
+
+func GetUserByUsername(db *sql.DB, username string) (*types.User, error) {
+	u := &types.User{}
+	query := "SELECT username, email, password FROM users WHERE username = ?"
+
+	err := db.QueryRow(query, username).Scan(&u.Username, &u.Email, &u.Password)
+	if err != nil {
+		return nil, err
+	}
+
+	return u, nil
 }
 
 func GetUsername(db *sql.DB, username string) (bool, error) {
@@ -136,4 +148,16 @@ func CheckTablesExists(db *sql.DB) (bool, error) {
 
 	return hasTable, nil
 
+}
+
+func UserExists(db *sql.DB, username string) (bool, error) {
+	var sw bool
+	query := `SELECT EXISTS(SELECT 1 FROM users WHERE username = ?)`
+
+	err := db.QueryRow(query, username).Scan(&sw)
+	if err != nil {
+		return false, err
+	}
+
+	return sw, nil
 }

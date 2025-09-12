@@ -28,6 +28,41 @@
   user-select: none;
   flex: 1;
   background: #3b4252;
+  display: flex;
+  flex-direction: column;
+}
+
+.right-pane .messages {
+  flex: 1;
+  overflow-y: auto;         /* scroll only messages */
+  padding: 1rem;
+}
+
+.right-pane .input-bar {
+  align-items: center;
+  justify-content: center;
+  border-top: 1px solid #4c566a;
+  background: #3b4252;
+  padding: 1rem;
+}
+
+.right-pane .input-bar input {
+  flex: 1;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #4c566a;
+  background: #434c5e;
+  color: #eceff4;
+}
+
+.right-pane .input-bar form,
+.right-pane .input-bar input {
+  box-sizing: border-box;
+}
+
+.right-pane .input-bar input::placeholder {
+  color: #88c0d0;
 }
 
 .divider {
@@ -120,8 +155,8 @@ textarea,
 
 .search-wrapper {
   position: relative;
-  width: 100%;              /* take full width of left pane */
-  justify-content: center;  /* center children horizontally */
+  width: 100%;
+  justify-content: center;
 }
 
 .search-form {
@@ -147,3 +182,7 @@ textarea,
   font-size: 14px;
 }
 
+.text-input {
+  display: fixed;
+  bottom: 0;
+}

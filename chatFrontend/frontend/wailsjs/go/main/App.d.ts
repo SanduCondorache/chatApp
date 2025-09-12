@@ -4,3 +4,5 @@
 export function Login(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function SearchUser(arg1:string):Promise<string>;
+
+export function SendMsgBetweenUsers(arg1:string,arg2:string,arg3:string):Promise<string>;

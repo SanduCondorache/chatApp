@@ -9,3 +9,7 @@ export function Login(arg1, arg2, arg3) {
 export function SearchUser(arg1) {
   return window['go']['main']['App']['SearchUser'](arg1);
 }
+
+export function SendMsgBetweenUsers(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SendMsgBetweenUsers'](arg1, arg2, arg3);
+}

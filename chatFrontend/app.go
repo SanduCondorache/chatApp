@@ -2,15 +2,15 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"github.com/SanduCondorache/chatApp/internal/client"
 	"github.com/SanduCondorache/chatApp/internal/types"
-	"github.com/gorilla/websocket"
 )
 
 type App struct {
-	ctx  context.Context
-	conn *websocket.Conn
+	ctx    context.Context
+	client *client.Client
 }
 
 func NewApp() *App {
@@ -19,31 +19,42 @@ func NewApp() *App {
 
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
-	conn, err := client.CreateConn()
+	client, err := client.NewClient()
 	if err != nil {
 		return
 	}
-	a.conn = conn
+	a.client = client
 }
 
 func (a *App) Login(username, email, password string) (string, error) {
 	user := types.NewUser(username, email, password)
 
-	err := client.SendMessage(a.conn, user, types.Login)
+	err := a.client.SendMessage(user, types.Login)
 	if err != nil {
 		return "", err
 	}
 
-	return client.ReadMessage(a.conn)
+	return a.client.ReadMessage()
 }
 
 func (a *App) SearchUser(username string) (string, error) {
 	msg := types.NewMessage(username)
 
-	err := client.SendMessage(a.conn, msg, types.Find)
+	err := a.client.SendMessage(msg, types.Find)
 	if err != nil {
 		return "", err
 	}
 
-	return client.ReadMessage(a.conn)
+	return a.client.ReadMessage()
+}
+
+func (a *App) SendMsgBetweenUsers(user1 string, user2 string, msg string) (string, error) {
+	temp := types.NewChatMessage(user1, user2, msg, time.Now())
+
+	err := a.client.SendMessage(temp, types.Chat)
+	if err != nil {
+		return "", err
+	}
+
+	return a.client.ReadMessage()
 }
