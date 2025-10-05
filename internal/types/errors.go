@@ -9,10 +9,11 @@ var (
 	ErrorUpgradeConnection = errors.New("upgrade error")
 	ErrorUsernameTaken     = errors.New("username is taken")
 	ErrorReadJson          = errors.New("read json error")
-	ErrorBadMessage        = errors.New("Unknown message type")
+	ErrorBadMessage        = errors.New("unknown message type")
 	ErrorReadingMessage    = errors.New("reading error")
 	ErrorWriteJson         = errors.New("write json error")
 	ErrorUserNotFound      = errors.New("user not found error")
+	ErrorIncorrectPassowrd = errors.New("incorrect password")
 )
 
 type Errors struct {

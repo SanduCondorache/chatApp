@@ -9,6 +9,7 @@ import (
 
 	"github.com/SanduCondorache/chatApp/internal/config"
 	"github.com/SanduCondorache/chatApp/internal/types"
+	"github.com/SanduCondorache/chatApp/utils"
 	"github.com/gorilla/websocket"
 )
 
@@ -18,6 +19,7 @@ type Client struct {
 }
 
 func NewClient() (*Client, error) {
+	utils.InitLogger()
 	u := url.URL{
 		Scheme: "ws",
 		Host:   "localhost:" + config.Envs.Port,
@@ -56,7 +58,7 @@ func (c *Client) readloop() {
 				continue
 			}
 
-			c.MsgCh <- "message_received"
+			c.MsgCh <- string(msg.Payload)
 			fmt.Println(m, "loh")
 
 		case types.MsgSent:
@@ -71,6 +73,10 @@ func (c *Client) readloop() {
 
 			fmt.Println(string(m.Payload), msg.Type)
 
+		case types.GetConn, types.GetMsg:
+
+			c.MsgCh <- string(msg.Payload)
+
 		default:
 			var m types.Message
 
@@ -79,9 +85,8 @@ func (c *Client) readloop() {
 				continue
 			}
 
-			c.MsgCh <- string(m.Payload)
-
 			fmt.Println(string(m.Payload), msg.Type)
+			c.MsgCh <- string(m.Payload)
 
 		}
 	}

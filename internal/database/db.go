@@ -5,8 +5,13 @@ import (
 	"log"
 
 	"github.com/SanduCondorache/chatApp/internal/types"
+	"github.com/SanduCondorache/chatApp/utils"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+type Store struct {
+	db *sql.DB
+}
 
 func CreateDb(path string) *sql.DB {
 	db, err := sql.Open("sqlite3", path)
@@ -49,13 +54,33 @@ func CreateDb(path string) *sql.DB {
 	return db
 }
 
-func InsertUser(db *sql.DB, user *types.User) error {
-	_, err := db.Exec("INSERT INTO users (username, email, password) VALUES (?, ?, ?)", user.Username, user.Email, user.Password)
+func NewStore(arg any) *Store {
+	switch v := arg.(type) {
+	case string:
+		return &Store{db: CreateDb(v)}
+	case *sql.DB:
+		return &Store{db: v}
+	default:
+		panic("unsupported argument type")
+	}
+}
+
+func (s *Store) InsertUser(user *types.User) error {
+	query := "INSERT INTO users (username, email, password) VALUES (?, ?, ?)"
+
+	pass, err := utils.HashPassword(user.Password)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.db.Exec(query, user.Username, user.Email, pass)
 	return err
 }
 
-func GetUserId(db *sql.DB, user *types.User) (int, error) {
-	rows, err := db.Query("SELECT id FROM users WHERE username = ?", user.Username)
+func (s *Store) GetUserId(username string) (int, error) {
+	query := "SELECT id FROM users WHERE username = ?"
+
+	rows, err := s.db.Query(query, username)
 
 	if err != nil {
 		return 0, err
@@ -78,11 +103,12 @@ func GetUserId(db *sql.DB, user *types.User) (int, error) {
 	return id, nil
 }
 
-func GetUserByUsername(db *sql.DB, username string) (*types.User, error) {
+func (s *Store) GetUserByUsername(username string) (*types.User, error) {
 	u := &types.User{}
 	query := "SELECT username, email, password FROM users WHERE username = ?"
 
-	err := db.QueryRow(query, username).Scan(&u.Username, &u.Email, &u.Password)
+	err := s.db.QueryRow(query, username).Scan(&u.Username, &u.Email, &u.Password)
+
 	if err != nil {
 		return nil, err
 	}
@@ -90,8 +116,10 @@ func GetUserByUsername(db *sql.DB, username string) (*types.User, error) {
 	return u, nil
 }
 
-func GetUsername(db *sql.DB, username string) (bool, error) {
-	rows, err := db.Query("SELECT 1 FROM users WHERE username = ?", username)
+func (s *Store) GetUsername(username string) (bool, error) {
+	query := "SELECT 1 FROM users WHERE username = ?"
+
+	rows, err := s.db.Query(query, username)
 
 	if err != nil {
 		return false, err
@@ -116,23 +144,62 @@ func GetUsername(db *sql.DB, username string) (bool, error) {
 	return exists, nil
 }
 
-func insertMessage(db *sql.DB, sender_id, recipient_id int, content string) error {
-	_, err := db.Exec("INSERT INTO messages (sender_id, recipient_id, content) VALUES (?, ?, ?)", sender_id, recipient_id, content)
+func (s *Store) InsertMessage(msg *types.ChatMessage) error {
+
+	sender_id, err := s.GetUserId(msg.Send)
+	if err != nil {
+		return err
+	}
+
+	recipient_id, err := s.GetUserId(msg.Recv)
+	if err != nil {
+		return err
+	}
+
+	query := "INSERT INTO messages (sender_id, recipient_id, content, timestamp) VALUES (?, ?, ?, ?)"
+
+	_, err = s.db.Exec(query, sender_id, recipient_id, msg.Msg, msg.Created_at.String())
 	return err
 }
 
-// func getUserMessagesBy(db *sql.DB, sender_id int) ([]string, error) {
-// 	rows, err := db.Query("SELECT DISTINCT u.username FROM m messages JOIN users u ON u.id = m.recipient_id WHERE m.sender_id = ?", sender_id)
-// 	if err != nil {
-// 		return []string{}, err
-// 	}
-//
-// 	defer rows.Close()
-// }
+func (s *Store) GetUserMessagesBy(sender, recipient string) (string, error) {
+
+	sender_id, err := s.GetUserId(sender)
+	if err != nil {
+		return "", err
+	}
+
+	recipient_id, err := s.GetUserId(recipient)
+	if err != nil {
+		return "", err
+	}
+
+	var messages string
+	query := `
+		SELECT json_group_array(
+			json_object(
+				'direction', CASE WHEN sender_id = ? THEN 'sent' ELSE 'received' END,
+				'content', content,
+				'timestamp', timestamp
+			)
+		) AS chat_json
+		FROM messages
+		WHERE (sender_id = ? AND recipient_id = ?)
+		OR (sender_id = ? AND recipient_id = ?)
+		ORDER BY timestamp;
+	`
+
+	err = s.db.QueryRow(query, recipient_id, sender_id, recipient_id, recipient_id, sender_id).Scan(&messages)
+	if err != nil {
+		return "", err
+	}
+
+	return messages, nil
+}
 
 func CheckTablesExists(db *sql.DB) (bool, error) {
 	var hasTable bool
-	err := db.QueryRow(`
+	query := `
 		SELECT EXISTS(
 			SELECT 1
 			FROM sqlite_master
@@ -140,7 +207,9 @@ func CheckTablesExists(db *sql.DB) (bool, error) {
 			  AND name NOT LIKE 'sqlite_%'
 			LIMIT 1
 		);
-	`).Scan(&hasTable)
+	`
+
+	err := db.QueryRow(query).Scan(&hasTable)
 
 	if err != nil {
 		return false, err
@@ -150,14 +219,38 @@ func CheckTablesExists(db *sql.DB) (bool, error) {
 
 }
 
-func UserExists(db *sql.DB, username string) (bool, error) {
+func (s *Store) UserExists(username string) (bool, error) {
 	var sw bool
 	query := `SELECT EXISTS(SELECT 1 FROM users WHERE username = ?)`
 
-	err := db.QueryRow(query, username).Scan(&sw)
+	err := s.db.QueryRow(query, username).Scan(&sw)
 	if err != nil {
 		return false, err
 	}
 
 	return sw, nil
+}
+
+func (s *Store) CheckPasswordIsCorrect(user *types.User) (bool, error) {
+	var passowrd string
+	query := `SELECT password from users WHERE username = ?`
+
+	err := s.db.QueryRow(query, user.Username).Scan(&passowrd)
+	if err != nil {
+		return false, err
+	}
+
+	return passowrd == user.Password, nil
+}
+
+func (s *Store) GetPassword(user *types.User) (string, error) {
+	var passowrd string
+	query := `SELECT password from users WHERE username = ?`
+
+	err := s.db.QueryRow(query, user.Username).Scan(&passowrd)
+	if err != nil {
+		return "", err
+	}
+
+	return passowrd, nil
 }

@@ -1,18 +1,22 @@
-import { useState } from "react";
-import { SearchUser as Search } from "../../wailsjs/go/main/App.js";
+import { useState, useRef } from "react";
+import { GetMessages, SearchUser as Search } from "../../wailsjs/go/main/App.js";
+import { MessageHist } from "../types/MessageHist.js";
 
 type LeftViewProps = {
-    onSelect: (value: string) => void;
+    sender: string;
+    onSelect: (username: string) => void;
+    onlineMap: Record<string, boolean>;
 };
 
-export function LeftView({ onSelect }: LeftViewProps) {
+export function LeftView({ sender, onSelect, onlineMap }: LeftViewProps) {
     const [username, setUsername] = useState("");
     const [results, setResults] = useState<string[]>([]);
-    const [selected, setselected] = useState<string[]>([]);
+    const [selected, setSelected] = useState<string[]>([]);
+    const mpSelected = useRef<Record<string, boolean>>({});
+    const [messages, setMessages] = useState<MessageHist[]>([]);
 
     const handleSearchUser = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-
         if (!username.trim()) {
             setResults([]);
             return;
@@ -22,33 +26,43 @@ export function LeftView({ onSelect }: LeftViewProps) {
             const res = await Search(username);
             if (res === "ok") {
                 setResults([username]);
-            } else {
+            }
+            else {
                 setResults(["User not found"]);
             }
-        } catch (error: any) {
-            setResults([`Error: ${error.toString()}`]);
+        } catch (err: any) {
+            setResults([`Error: ${err.toString()}`]);
         }
     };
 
-    const handleSelectResult = (value: string) => {
-        if (username === "clear") {
-            setselected([]);
+    const handleSelectResult = async (value: string) => {
+        if (mpSelected.current[value]) {
+            setResults([]);
+            return;
         }
         if (results[0] === "User not found") {
             setResults([]);
             onSelect("");
             return;
         }
-        setselected(prev => [...prev, value]);
+
+        try {
+            const msgs: MessageHist[] = await GetMessages(sender, value);
+            setMessages(msgs);
+        } catch (err) {
+            console.error("Failed to fetch messages:", err);
+        }
+
+        setSelected(prev => [...prev, value]);
+        mpSelected.current[value] = true;
         onSelect(value);
         setUsername("");
         setResults([]);
-    }
-
-
+    };
     return (
         <div className="split-pane left-pane">
             <h2>Chats List</h2>
+
             <div className="search-wrapper">
                 <form onSubmit={handleSearchUser} className="search-form">
                     <div className={`search ${results.length > 0 ? "has-results" : ""}`}>
@@ -59,32 +73,43 @@ export function LeftView({ onSelect }: LeftViewProps) {
                             placeholder="Search"
                             value={username}
                             onChange={(e) => {
-                                const value = e.target.value;
-                                setUsername(value);
-
-                                if (!value.trim()) {
-                                    setResults([]);
-                                }
+                                const val = e.target.value;
+                                setUsername(val);
+                                if (!val.trim()) setResults([]);
                             }}
                         />
                         <button type="submit" style={{ display: "none" }} />
                     </div>
+
                     {results.length > 0 && (
                         <div className="search-dropdown">
                             {results.map((r, i) => (
-                                <div
-                                    key={i}
-                                    className="search-item"
-                                    onClick={() => handleSelectResult(r)}
-                                >{r}</div>
+                                <div key={i} className="search-item" onClick={() => handleSelectResult(r)}>
+                                    {r}
+                                </div>
                             ))}
                         </div>
                     )}
                 </form>
             </div>
-            {selected.map((r, i) => (
-                <div key={i} className="selected-result">{r}</div>
-            ))}
+
+            <div className="chat-list">
+                {selected.map((r, i) => (
+                    <div key={i} className="chat-item" onClick={() => onSelect(r)}>
+                        <div className="avatar">{r[0].toUpperCase()}</div>
+                        <div className="chat-info">
+                            <div className="chat-name">{r}</div>
+                            <div className="chat-last">Last message preview...</div>
+                            <div className="chat-temp">
+                                <span
+                                    className="chat-online"
+                                    style={{ backgroundColor: onlineMap[r] ? "green" : "red" }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }

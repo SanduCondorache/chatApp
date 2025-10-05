@@ -1,30 +1,25 @@
 import { useNavigate } from "react-router-dom";
-import "./Login.css";
-import { Login as GoLogin } from "../../wailsjs/go/main/App.js"
+import "./Register.css";
+import { Register as GoRegister } from "../../wailsjs/go/main/App.js"
 import { useState } from "react";
 
-type LoginProps = {
-    onSelect: (value: string) => void;
-};
 
-export function Login({ onSelect }: LoginProps) {
+export function Register() {
     const navigate = useNavigate();
     const [username, setUsername] = useState("");
+    const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [err, setErr] = useState("");
 
-    const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
         try {
-            const result = await GoLogin(username, password);
+            const result = await GoRegister(username, email, password);
             if (result == "ok") {
-                onSelect(username);
                 navigate('/home');
             } else if (result == "username_taken") {
                 setErr("Username is already taken");
-            } else if (result == "incorrect_password") {
-                setErr("Password is incorrect")
             }
         } catch (error: any) {
             setErr("Error:" + error.toString());
@@ -36,8 +31,8 @@ export function Login({ onSelect }: LoginProps) {
     return (
         <section>
             <div className="login-box">
-                <form onSubmit={handleLogin}>
-                    <h2>Login</h2>
+                <form onSubmit={handleRegister}>
+                    <h2>Register</h2>
                     <div className="input-box">
                         <span className='icon'></span>
                         <input type="username" value={username} onChange={e => setUsername(e.target.value)} required />
@@ -45,17 +40,18 @@ export function Login({ onSelect }: LoginProps) {
                     </div>
                     <div className="input-box">
                         <span className='icon'></span>
+                        <input type="email" value={email} onChange={e => setEmail(e.target.value)} required />
+                        <label>Email</label>
+                    </div>
+                    <div className="input-box">
+                        <span className='icon'></span>
                         <input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
                         <label>Password</label>
                     </div>
                     {err && <p className="error-message">{err}</p>}
-                    <button type='submit'>Login</button>
-                    <div className='register-link'>
-                        <p> Don't have an account? <a href='#' onClick={() => navigate("/register")}>Register</a></p>
-                    </div>
+                    <button type='submit'>Register</button>
                 </form>
             </div>
         </section>
     )
-
 }
