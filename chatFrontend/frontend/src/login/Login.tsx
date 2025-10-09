@@ -1,13 +1,14 @@
 import { useNavigate } from "react-router-dom";
 import "./Login.css";
-import { Login as GoLogin } from "../../wailsjs/go/main/App.js"
+import { GetChats, Login as GoLogin } from "../../wailsjs/go/main/App.js"
 import { useState } from "react";
 
 type LoginProps = {
-    onSelect: (value: string) => void;
+    onSelectUser: (value: string) => void;
+    onSelectChats: (value: string[]) => void;
 };
 
-export function Login({ onSelect }: LoginProps) {
+export function Login({ onSelectUser, onSelectChats }: LoginProps) {
     const navigate = useNavigate();
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
@@ -19,7 +20,13 @@ export function Login({ onSelect }: LoginProps) {
         try {
             const result = await GoLogin(username, password);
             if (result == "ok") {
-                onSelect(username);
+                onSelectUser(username);
+                try {
+                    const res = await GetChats(username);
+                    onSelectChats(res);
+                } catch (error: any) {
+                    setErr("Error:" + error.toString());
+                }
                 navigate('/home');
             } else if (result == "username_taken") {
                 setErr("Username is already taken");

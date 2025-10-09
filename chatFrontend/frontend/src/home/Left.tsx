@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { GetMessages, SearchUser as Search } from "../../wailsjs/go/main/App.js";
 import { MessageHist } from "../types/MessageHist.js";
 
@@ -7,13 +7,19 @@ type LeftViewProps = {
     onSelect: (username: string) => void;
     onSelectMessages: (messages: MessageHist[]) => void;
     onlineMap: Record<string, boolean>;
+    chats: string[];
 };
 
-export function LeftView({ sender, onSelect, onSelectMessages, onlineMap }: LeftViewProps) {
+export function LeftView({ sender, onSelect, onSelectMessages, onlineMap, chats }: LeftViewProps) {
     const [username, setUsername] = useState("");
     const [results, setResults] = useState<string[]>([]);
     const [selected, setSelected] = useState<string[]>([]);
     const mpSelected = useRef<Record<string, boolean>>({});
+
+    useEffect(() => {
+        setSelected(chats);
+        mpSelected.current = Object.fromEntries(chats.map(chat => [chat, true]));
+    }, [chats]);
 
     const handleSearchUser = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();

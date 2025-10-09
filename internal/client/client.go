@@ -2,7 +2,6 @@ package client
 
 import (
 	"encoding/json"
-	"errors"
 	"log/slog"
 	"net/url"
 
@@ -71,7 +70,7 @@ func (c *Client) readloop() {
 
 			c.MsgCh <- "message_sent"
 
-		case types.GetConn, types.GetMsg:
+		case types.GetConn, types.GetMsg, types.GetChats:
 
 			c.MsgCh <- string(msg.Payload)
 

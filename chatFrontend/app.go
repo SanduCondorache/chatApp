@@ -172,3 +172,35 @@ func (a *App) GetMessages(user1, user2 string) ([]types.MessageHist, error) {
 
 	return msgs, nil
 }
+
+func (a *App) GetChats(user string) ([]string, error) {
+	msg := types.NewMessage(user)
+
+	err := a.client.SendMessage(msg, types.GetChats)
+	if err != nil {
+		return nil, err
+	}
+
+	str, err := a.client.ReadMessage()
+	if err != nil {
+		return nil, err
+	}
+
+	var mp map[string][]string
+
+	var m types.Message
+
+	if err = json.Unmarshal([]byte(str), &m); err != nil {
+		slog.Error("unmarshal error", "err", err)
+		return nil, err
+	}
+
+	fmt.Println(string(m.Payload))
+
+	if err = json.Unmarshal(m.Payload, &mp); err != nil {
+		slog.Error("unmarshal error", "err", err)
+		return nil, err
+	}
+
+	return mp["chats"], nil
+}

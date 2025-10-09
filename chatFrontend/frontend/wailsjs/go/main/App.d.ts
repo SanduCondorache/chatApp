@@ -4,6 +4,8 @@ import {types} from '../models';
 
 export function CheckIsUserOnline(arg1:Array<string>):Promise<Record<string, boolean>>;
 
+export function GetChats(arg1:string):Promise<Array<string>>;
+
 export function GetMessages(arg1:string,arg2:string):Promise<Array<types.MessageHist>>;
 
 export function Login(arg1:string,arg2:string):Promise<string>;

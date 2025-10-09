@@ -14,4 +14,5 @@ const (
 	Ok       MessageType = "ok"
 	MsgRecv  MessageType = "message_received"
 	MsgSent  MessageType = "message_sent"
+	GetChats MessageType = "get_chats"
 )

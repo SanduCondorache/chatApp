@@ -7,9 +7,10 @@ import { MessageHist } from "../types/MessageHist";
 
 type HomeProps = {
     user: string;
+    chats: string[];
 };
 
-export default function SplitView({ user }: HomeProps) {
+export default function SplitView({ user, chats }: HomeProps) {
     const [leftW, setLeftW] = useState(300);
     const containerRef = useRef<HTMLDivElement | null>(null);
     const isResizing = useRef(false);
@@ -19,6 +20,11 @@ export default function SplitView({ user }: HomeProps) {
     const [onlineMap, setOnlineMap] = useState<Record<string, boolean>>({});
     const [messages, setMessages] = useState<MessageHist[]>([]);
     const isFetching = useRef(false);
+
+    useEffect(() => {
+        setSelectedUsers(chats);
+    }, [chats]);
+
 
     useEffect(() => {
         const interval = setInterval(async () => {
@@ -69,6 +75,7 @@ export default function SplitView({ user }: HomeProps) {
                     }}
                     onSelectMessages={setMessages}
                     onlineMap={onlineMap}
+                    chats={chats}
                 />
             </div>
 

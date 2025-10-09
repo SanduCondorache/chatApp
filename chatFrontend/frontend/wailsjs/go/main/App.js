@@ -6,6 +6,10 @@ export function CheckIsUserOnline(arg1) {
   return window['go']['main']['App']['CheckIsUserOnline'](arg1);
 }
 
+export function GetChats(arg1) {
+  return window['go']['main']['App']['GetChats'](arg1);
+}
+
 export function GetMessages(arg1, arg2) {
   return window['go']['main']['App']['GetMessages'](arg1, arg2);
 }

@@ -2,6 +2,7 @@ package db
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 
 	"github.com/SanduCondorache/chatApp/internal/types"
@@ -253,4 +254,47 @@ func (s *Store) GetPassword(user *types.User) (string, error) {
 	}
 
 	return passowrd, nil
+}
+
+func (s *Store) CheckMessagesBetweenUsersExists(sender string) ([]int, error) {
+	query := `
+	SELECT DISTINCT
+		CASE
+			WHEN sender_id = ? THEN recipient_id
+			ELSE sender_id
+		END AS other_user_id
+	FROM messages
+	WHERE sender_id = ? OR recipient_id = ?`
+
+	sender_id, err := s.GetUserId(sender)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := s.db.Query(query, sender_id, sender_id, sender_id)
+	defer rows.Close()
+
+	var chats []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		chats = append(chats, id)
+	}
+
+	return chats, nil
+}
+
+func (s *Store) GetUsernameById(id int) (string, error) {
+	var username string
+	query := `SELECT username FROM users WHERE id = ?`
+
+	err := s.db.QueryRow(query, id).Scan(&username)
+	fmt.Println(id)
+	if err != nil {
+		return "", err
+	}
+
+	return username, nil
 }

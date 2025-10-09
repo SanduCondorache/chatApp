@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
@@ -293,6 +294,44 @@ func (s *Server) getMessages(msg types.Envelope, conn *websocket.Conn) error {
 	return nil
 }
 
+func (s *Server) getChats(msg types.Envelope, conn *websocket.Conn) error {
+	var m types.Message
+	if err := json.Unmarshal(msg.Payload, &m); err != nil {
+		return err
+	}
+
+	temp, err := s.Database.CheckMessagesBetweenUsersExists(string(m.Payload))
+	if err != nil {
+		return err
+	}
+
+	var chats []string
+	for _, id := range temp {
+		fmt.Println(id)
+		username, err := s.Database.GetUsernameById(id)
+		if err != nil {
+			chats = append(chats, "")
+			continue
+		}
+
+		chats = append(chats, username)
+	}
+
+	fmt.Println(chats)
+
+	mp := map[string][]string{
+		"chats": chats,
+	}
+
+	data, err := json.Marshal(mp)
+	if err != nil {
+		return err
+	}
+
+	sendMessageFromServer(types.GetChats, string(data), conn)
+	return nil
+}
+
 func (s *Server) readLoop(conn *websocket.Conn) {
 	defer func() {
 		s.RemoveCh <- conn
@@ -330,6 +369,11 @@ func (s *Server) readLoop(conn *websocket.Conn) {
 			}
 		case types.GetMsg:
 			if err := s.getMessages(msg, conn); err != nil {
+				slog.Error("read json error", "err", err)
+				return
+			}
+		case types.GetChats:
+			if err := s.getChats(msg, conn); err != nil {
 				slog.Error("read json error", "err", err)
 				return
 			}
