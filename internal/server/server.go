@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"sync"
@@ -25,10 +26,10 @@ type Server struct {
 	ClientsRev map[string]*websocket.Conn
 	AddCh      chan *websocket.Conn
 	RemoveCh   chan *websocket.Conn
-	MsgCh      chan types.ChatMessage
 	QuitCh     chan struct{}
 	Database   *dab.Store
 	mutex      sync.Mutex
+	logger     *slog.Logger
 }
 
 func CreateServer(listenAddr string, db *dab.Store) *Server {
@@ -45,10 +46,12 @@ func CreateServer(listenAddr string, db *dab.Store) *Server {
 		AddCh:      make(chan *websocket.Conn),
 		RemoveCh:   make(chan *websocket.Conn),
 		QuitCh:     make(chan struct{}),
-		MsgCh:      make(chan types.ChatMessage),
 		mutex:      sync.Mutex{},
 		Database:   db,
 		ClientsRev: map[string]*websocket.Conn{},
+		logger: slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			AddSource: true,
+		})),
 	}
 }
 
@@ -56,21 +59,21 @@ func NewServer(listenAddr string) *Server {
 	dbPath := config.Envs.DBPath
 
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		log.Println("DB file not found, creating and initializing DB...")
+		slog.Info("DB file not found, creating and initializing DB...")
 		db := dab.NewStore(dbPath)
 		return CreateServer(listenAddr, db)
 	}
 
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
-		log.Println("Opening database error: ", err)
+		slog.Error("Opening database error", "err", err)
 		return nil
 	}
 
 	has, err := dab.CheckTablesExists(db)
 
 	if err != nil {
-		log.Println("query error: ", err)
+		slog.Error("query error", "err", err)
 	}
 
 	if !has {
@@ -86,7 +89,7 @@ func (s *Server) Start() error {
 	go s.broadcastLoop()
 	go s.listenForCommands()
 
-	log.Println("Server listening on: ", s.ListenAddr)
+	slog.Info("Server listening", "addr", s.ListenAddr)
 
 	return http.ListenAndServe(s.ListenAddr, nil)
 }
@@ -94,7 +97,7 @@ func (s *Server) Start() error {
 func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	conn, err := s.Upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println("Upgrade error:", err)
+		slog.Error("Upgrade error", "err", err)
 		return
 	}
 
@@ -122,8 +125,8 @@ func (s *Server) loginUser(msg types.Envelope, conn *websocket.Conn) error {
 
 	exists, err := s.Database.UserExists(user.Username)
 	if err != nil {
-		sendMessageFromServer(types.Error, "user_not_found", conn)
-		return err
+		sendMessageFromServer(types.Error, types.ErrorUserNotFound.Error(), conn)
+		return nil
 	}
 
 	hasedPassword, err := s.Database.GetPassword(user)
@@ -131,11 +134,11 @@ func (s *Server) loginUser(msg types.Envelope, conn *websocket.Conn) error {
 	sw := utils.ComparePasswords(hasedPassword, user.Password)
 
 	if !sw {
-		sendMessageFromServer(types.Error, "incorrect_password", conn)
-		return err
+		sendMessageFromServer(types.Error, types.ErrorIncorrectPassowrd.Error(), conn)
+		return nil
 	}
 
-	log.Println(user.Username, "has logged in")
+	slog.Info("user", user.Username, "has logged in")
 
 	s.mutex.Lock()
 	s.Clients[conn] = user
@@ -161,8 +164,8 @@ func (s *Server) registerUser(msg types.Envelope, conn *websocket.Conn) error {
 	if err != nil {
 		var errr sqlite3.Error
 		if errors.As(err, &errr) && errr.Code == sqlite3.ErrConstraint {
-			sendMessageFromServer(types.Error, "username_taken", conn)
-			log.Println("Username is already used")
+			sendMessageFromServer(types.Error, types.ErrorUsernameTaken.Error(), conn)
+			slog.Error("Username is already used", "user", user.Username)
 			return nil
 		}
 		return err
@@ -191,10 +194,29 @@ func (s *Server) handleChatMessages(msg types.Envelope, conn *websocket.Conn) er
 	if err := json.Unmarshal(msg.Payload, &m); err != nil {
 		return err
 	}
-	log.Println(m)
 
 	err := s.Database.InsertMessage(&m)
 	if err != nil {
+		return err
+	}
+
+	reciver, err := s.getUserConn(m.Recv)
+	if err != nil {
+		return err
+	}
+
+	if reciver == nil {
+		sendMessageFromServer(types.MsgSent, "ok", conn)
+		return nil
+	}
+
+	data, err := m.ToEnvelopePayload()
+	if err != nil {
+		return err
+	}
+
+	env := types.NewEnvelope(types.MsgRecv, data)
+	if err = reciver.WriteJSON(&env); err != nil {
 		return err
 	}
 
@@ -216,7 +238,7 @@ func (s *Server) findUser(msg types.Envelope, conn *websocket.Conn) error {
 	}
 
 	if !exists {
-		sendMessageFromServer(types.Error, "user_not_found", conn)
+		sendMessageFromServer(types.Error, types.ErrorUserNotFound.Error(), conn)
 		return nil
 	}
 
@@ -280,40 +302,39 @@ func (s *Server) readLoop(conn *websocket.Conn) {
 	for {
 		var msg types.Envelope
 		if err := conn.ReadJSON(&msg); err != nil {
-			log.Println("read json error: ", err)
+			slog.Error("read json error", "err", err)
 			s.RemoveCh <- conn
 			return
 		}
 
 		switch msg.Type {
 		case types.Login, types.Register:
-			log.Println("Initial messsage from " + utils.NormalizeAddr(conn.RemoteAddr().String()))
 			if err := s.registerOrLoginUser(msg, conn); err != nil {
-				log.Println("reading user err: ", err)
+				slog.Error("read json error", "err", err)
 				return
 			}
 		case types.Chat:
 			if err := s.handleChatMessages(msg, conn); err != nil {
-				log.Println("reading message err: ", err)
+				slog.Error("read json error", "err", err)
 				return
 			}
 		case types.Find:
 			if err := s.findUser(msg, conn); err != nil {
-				log.Println("reading message err: ", err)
+				slog.Error("read json error", "err", err)
 				return
 			}
 		case types.GetConn:
 			if err := s.checkOnlineUsers(msg, conn); err != nil {
-				log.Println("reading message err: ", err)
+				slog.Error("read json error", "err", err)
 				return
 			}
 		case types.GetMsg:
 			if err := s.getMessages(msg, conn); err != nil {
-				log.Println("reading message err: ", err)
+				slog.Error("read json error", "err", err)
 				return
 			}
 		default:
-			log.Println("unknown message type ", msg.Type)
+			slog.Error("unknown message type ", "type", msg.Type)
 		}
 
 	}
@@ -323,7 +344,7 @@ func (s *Server) broadcastLoop() {
 	for {
 		select {
 		case conn := <-s.AddCh:
-			log.Println("New client connected", utils.NormalizeAddr(conn.RemoteAddr().String()))
+			slog.Info("New client connected", "addr", utils.NormalizeAddr(conn.RemoteAddr().String()))
 		case conn := <-s.RemoveCh:
 			s.mutex.Lock()
 			if _, ok := s.Clients[conn]; ok {
@@ -331,13 +352,8 @@ func (s *Server) broadcastLoop() {
 				delete(s.ClientsRev, u.Username)
 				delete(s.Clients, conn)
 				conn.Close()
-				log.Println("Client disconnected")
+				slog.Info("Client disconnected")
 			}
-			s.mutex.Unlock()
-
-		case msg := <-s.MsgCh:
-			s.mutex.Lock()
-			log.Println(msg)
 			s.mutex.Unlock()
 
 		case <-s.QuitCh:
@@ -351,7 +367,7 @@ func (s *Server) listenForCommands() {
 
 	for scanner.Scan() {
 		if scanner.Text() == "exit" {
-			log.Println("Shutting down server...")
+			slog.Info("Shutting down server...")
 
 			close(s.QuitCh)
 
@@ -359,7 +375,7 @@ func (s *Server) listenForCommands() {
 			env := types.NewEnvelope(types.Exit, nil)
 			for conn := range s.Clients {
 				if err := conn.WriteJSON(env); err != nil {
-					log.Println("write error:", err)
+					slog.Error("write error", "err", err)
 					continue
 				}
 				conn.Close()
@@ -368,17 +384,6 @@ func (s *Server) listenForCommands() {
 			s.mutex.Unlock()
 
 			os.Exit(0)
-		} else if scanner.Text() == "get" {
-			s.mutex.Lock()
-			log.Println("ClientsRev:", len(s.ClientsRev))
-			for user := range s.ClientsRev {
-				log.Println(user)
-			}
-			log.Println("Clients:", len(s.Clients))
-			for conn, user := range s.Clients {
-				log.Printf("%s -> %v\n", utils.NormalizeAddr(conn.RemoteAddr().String()), user.Username)
-			}
-			s.mutex.Unlock()
 		}
 	}
 }

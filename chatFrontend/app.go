@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/SanduCondorache/chatApp/internal/client"
 	"github.com/SanduCondorache/chatApp/internal/types"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type App struct {
@@ -27,6 +29,14 @@ func (a *App) Startup(ctx context.Context) {
 		return
 	}
 	a.client = client
+
+	go func() {
+		for m := range a.client.ChatCh {
+			data, _ := json.Marshal(m)
+			fmt.Println(m)
+			runtime.EventsEmit(a.ctx, "chat:received", string(data))
+		}
+	}()
 }
 
 func (a *App) Register(username, email, password string) (string, error) {
@@ -70,7 +80,12 @@ func (a *App) SendMsgBetweenUsers(user1 string, user2 string, msg string) (strin
 		return "", err
 	}
 
-	return a.client.ReadMessage()
+	str, err := a.client.ReadMessage()
+	if err != nil {
+		return "", err
+	}
+
+	return str, nil
 }
 
 func (a *App) CheckIsUserOnline(users []string) (map[string]bool, error) {
@@ -93,14 +108,22 @@ func (a *App) CheckIsUserOnline(users []string) (map[string]bool, error) {
 
 	str, err := a.client.ReadMessage()
 
-	var m map[string]any
+	var mp map[string]any
+
+	var m types.Message
 
 	if err = json.Unmarshal([]byte(str), &m); err != nil {
-		log.Println("unmarshal error:", err)
+		slog.Error("unmarshal error", "err", err)
 		return nil, err
 	}
+
+	if err = json.Unmarshal(m.Payload, &mp); err != nil {
+		slog.Error("unmarshal error", "err", err)
+		return nil, err
+	}
+
 	res := make(map[string]bool)
-	for k, v := range m {
+	for k, v := range mp {
 		switch val := v.(type) {
 		case bool:
 			res[k] = val
@@ -135,9 +158,14 @@ func (a *App) GetMessages(user1, user2 string) ([]types.MessageHist, error) {
 	if err != nil {
 		return nil, err
 	}
+	var m types.Message
+
+	if err := json.Unmarshal([]byte(str), &m); err != nil {
+		return nil, err
+	}
 
 	var msgs []types.MessageHist
-	err = json.Unmarshal([]byte(str), &msgs)
+	err = json.Unmarshal(m.Payload, &msgs)
 	if err != nil {
 		return nil, err
 	}

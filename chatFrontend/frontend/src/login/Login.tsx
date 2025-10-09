@@ -24,7 +24,9 @@ export function Login({ onSelect }: LoginProps) {
             } else if (result == "username_taken") {
                 setErr("Username is already taken");
             } else if (result == "incorrect_password") {
-                setErr("Password is incorrect")
+                setErr("Password is incorrect");
+            } else if (result == "user_not_found") {
+                setErr("User not found");
             }
         } catch (error: any) {
             setErr("Error:" + error.toString());

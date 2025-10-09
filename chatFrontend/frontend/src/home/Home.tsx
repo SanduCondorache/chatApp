@@ -3,6 +3,7 @@ import { LeftView } from "./Left";
 import { RightView } from "./Right";
 import { CheckIsUserOnline } from "../../wailsjs/go/main/App.js";
 import "./Home.css";
+import { MessageHist } from "../types/MessageHist";
 
 type HomeProps = {
     user: string;
@@ -16,6 +17,7 @@ export default function SplitView({ user }: HomeProps) {
     const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
     const [selected, setSelected] = useState<string>(""); // current chat
     const [onlineMap, setOnlineMap] = useState<Record<string, boolean>>({});
+    const [messages, setMessages] = useState<MessageHist[]>([]);
     const isFetching = useRef(false);
 
     useEffect(() => {
@@ -65,6 +67,7 @@ export default function SplitView({ user }: HomeProps) {
                             setSelectedUsers(prev => [...prev, user]);
                         }
                     }}
+                    onSelectMessages={setMessages}
                     onlineMap={onlineMap}
                 />
             </div>
@@ -74,6 +77,7 @@ export default function SplitView({ user }: HomeProps) {
             <RightView
                 selected={selected}
                 sender={user}
+                mess={messages}
                 onlineMap={onlineMap}
             />
         </div>

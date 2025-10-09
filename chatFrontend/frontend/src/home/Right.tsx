@@ -1,15 +1,39 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SendMsgBetweenUsers as SendMsg } from "../../wailsjs/go/main/App.js";
+import { EventsOn, EventsOff } from "../../wailsjs/runtime/runtime.js";
+import { ChatMessage } from "../types/ChatMessages.js";
+import { MessageHist } from "../types/MessageHist.js";
 
 type RightViewProps = {
     selected: string;
     sender: string;
+    mess: MessageHist[];
     onlineMap: Record<string, boolean>;
 };
 
-export function RightView({ selected, sender, onlineMap }: RightViewProps) {
+export function RightView({ selected, sender, mess, onlineMap }: RightViewProps) {
     const [msg, setMsg] = useState("");
-    const [messages, setMessages] = useState<string[]>([]);
+    const [messages, setMessages] = useState<MessageHist[]>(mess);
+
+    useEffect(() => {
+        setMessages(mess);
+    }, [mess]);
+
+    useEffect(() => {
+        const handler = (payload: string) => {
+            const msg = JSON.parse(payload) as ChatMessage;
+            console.log("chat event received", msg.msg, sender)
+            if (msg.recv_id !== sender) return;
+            setMessages(prev => [
+                ...prev,
+                { direction: "received", content: msg.msg, time: new Date(msg.created_at).toString() }
+            ]);
+        };
+
+        EventsOn("chat:received", handler);
+        return () => EventsOff("chat:received");
+    }, [sender]);
+
 
     const handleMsgInsert = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -18,10 +42,16 @@ export function RightView({ selected, sender, onlineMap }: RightViewProps) {
         try {
             const result = await SendMsg(sender, selected, msg);
             if (result === "message_sent") {
-                setMessages(prev => [...prev, msg]);
+                let temp: MessageHist;
+                temp = {
+                    direction: "sent",
+                    content: msg,
+                    time: new Date().toString()
+                }
+
+                setMessages(prev => [...prev, temp]);
                 setMsg("");
             }
-            else console.log("Message recv failed");
         } catch (err: any) {
             console.log(err.toString());
         }
@@ -29,6 +59,7 @@ export function RightView({ selected, sender, onlineMap }: RightViewProps) {
 
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!selected) return;
         setMsg(e.target.value);
     };
 
@@ -47,10 +78,14 @@ export function RightView({ selected, sender, onlineMap }: RightViewProps) {
                     <h2 className="chat-title">Right Pane</h2>
                 )}
             </div>
-            <div className="messages">
-                {messages.map((m, i) => (
-                    <p key={i}>{m}</p>
-                ))}
+            <div className="messages chat-container1">
+                {messages.map((m, i) => {
+                    if (m.direction === "sent") {
+                        return <div className="message sent-messages" key={i}>{m.content}</div>;
+                    } else {
+                        return <div className="message received-messages" key={i}>{m.content}</div>;
+                    }
+                })}
             </div>
             <div className="input-bar">
                 <form onSubmit={handleMsgInsert}>

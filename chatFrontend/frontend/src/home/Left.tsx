@@ -5,15 +5,15 @@ import { MessageHist } from "../types/MessageHist.js";
 type LeftViewProps = {
     sender: string;
     onSelect: (username: string) => void;
+    onSelectMessages: (messages: MessageHist[]) => void;
     onlineMap: Record<string, boolean>;
 };
 
-export function LeftView({ sender, onSelect, onlineMap }: LeftViewProps) {
+export function LeftView({ sender, onSelect, onSelectMessages, onlineMap }: LeftViewProps) {
     const [username, setUsername] = useState("");
     const [results, setResults] = useState<string[]>([]);
     const [selected, setSelected] = useState<string[]>([]);
     const mpSelected = useRef<Record<string, boolean>>({});
-    const [messages, setMessages] = useState<MessageHist[]>([]);
 
     const handleSearchUser = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
@@ -36,10 +36,6 @@ export function LeftView({ sender, onSelect, onlineMap }: LeftViewProps) {
     };
 
     const handleSelectResult = async (value: string) => {
-        if (mpSelected.current[value]) {
-            setResults([]);
-            return;
-        }
         if (results[0] === "User not found") {
             setResults([]);
             onSelect("");
@@ -48,10 +44,16 @@ export function LeftView({ sender, onSelect, onlineMap }: LeftViewProps) {
 
         try {
             const msgs: MessageHist[] = await GetMessages(sender, value);
-            setMessages(msgs);
+            onSelectMessages(msgs);
         } catch (err) {
             console.error("Failed to fetch messages:", err);
         }
+
+        if (mpSelected.current[value]) {
+            setResults([]);
+            return;
+        }
+
 
         setSelected(prev => [...prev, value]);
         mpSelected.current[value] = true;
@@ -59,6 +61,17 @@ export function LeftView({ sender, onSelect, onlineMap }: LeftViewProps) {
         setUsername("");
         setResults([]);
     };
+
+    const handleSelectedList = async (value: string) => {
+        onSelect(value);
+        try {
+            const msgs: MessageHist[] = await GetMessages(sender, value);
+            onSelectMessages(msgs);
+        } catch (err) {
+            console.error("Failed to fetch messages:", err);
+        }
+    };
+
     return (
         <div className="split-pane left-pane">
             <h2>Chats List</h2>
@@ -95,7 +108,7 @@ export function LeftView({ sender, onSelect, onlineMap }: LeftViewProps) {
 
             <div className="chat-list">
                 {selected.map((r, i) => (
-                    <div key={i} className="chat-item" onClick={() => onSelect(r)}>
+                    <div key={i} className="chat-item" onClick={() => handleSelectedList(r)}>
                         <div className="avatar">{r[0].toUpperCase()}</div>
                         <div className="chat-info">
                             <div className="chat-name">{r}</div>
